@@ -299,14 +299,35 @@
 
   <footer id="footer-info"></footer>
 </div>
-
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  let todasLasVisitas = JSON.parse(localStorage.getItem("visitas") || "[]");
+  const supabaseUrl = 'https://juukgnzptplgywgoasam.supabase.co';
+  const supabaseKey = 'sb_publishable_eT3m6Ybs_Toh7CPctmI_Eg_OCAub_wz';
+  const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+  let todasLasVisitas = [];
+
+  async function cargarVisitas() {
+    try {
+      const { data: visitas, error } = await supabaseClient
+        .from('visitas')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (error) throw error;
+
+      todasLasVisitas = visitas || [];
+      renderTabla(todasLasVisitas);
+      actualizarStats(todasLasVisitas);
+    } catch (error) {
+      console.error("Error al cargar visitas:", error);
+    }
+  }
 
   function renderTabla(visitas) {
     const tabla = document.getElementById("tabla");
     if (visitas.length === 0) {
-      tabla.innerHTML = `<tr><td colspan="7" class="empty"><span>📋</span>No hay visitas registradas aún.<br>Abre las páginas del restaurante primero.</td></tr>`;
+      tabla.innerHTML = `<tr><td colspan="7" class="empty"><span>📋</span>No hay visitas registradas aún.</td></tr>`;
       return;
     }
     tabla.innerHTML = visitas.map((v, i) => `
@@ -333,6 +354,8 @@
     if (ultima) {
       document.getElementById("footer-info").textContent =
         `Última visita: ${ultima.fecha} a las ${ultima.hora} — ${ultima.ip}`;
+    } else {
+      document.getElementById("footer-info").textContent = "";
     }
   }
 
@@ -346,12 +369,22 @@
     renderTabla(filtradas);
   }
 
-  function limpiar() {
-    if (confirm("¿Seguro que quieres borrar todo el registro de visitas?")) {
-      localStorage.removeItem("visitas");
-      todasLasVisitas = [];
-      renderTabla([]);
-      actualizarStats([]);
+  async function limpiar() {
+    if (confirm("¿Seguro que quieres borrar todo el registro de visitas de la base de datos?")) {
+      try {
+        const { error } = await supabaseClient
+          .from('visitas')
+          .delete()
+          .neq('id', 0);
+
+        if (error) throw error;
+
+        todasLasVisitas = [];
+        renderTabla([]);
+        actualizarStats([]);
+      } catch (error) {
+        alert("Error al limpiar visitas: " + error.message);
+      }
     }
   }
 
@@ -370,8 +403,7 @@
   }
 
   // Iniciar
-  renderTabla(todasLasVisitas);
-  actualizarStats(todasLasVisitas);
+  cargarVisitas();
 </script>
 </body>
 </html>
