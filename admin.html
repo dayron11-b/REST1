@@ -324,24 +324,35 @@
     }
   }
 
-  function renderTabla(visitas) {
+ function renderTabla(visitas) {
     const tabla = document.getElementById("tabla");
     if (visitas.length === 0) {
-      tabla.innerHTML = `<tr><td colspan="7" class="empty"><span>📋</span>No hay visitas registradas aún.</td></tr>`;
-      return;
+        // Cambiamos colspan a 8 porque añadimos una columna más
+        tabla.innerHTML = `<tr><td colspan="8" class="empty"><span>📋 </span>No hay visitas registradas aún.</td></tr>`;
+        return;
     }
-    tabla.innerHTML = visitas.map((v, i) => `
-      <tr>
-        <td class="num-cell">${i + 1}</td>
-        <td><span class="ip-badge">${v.ip || "-"}</span></td>
-        <td>${v.ciudad || "-"}</td>
-        <td>${v.pais || "-"}</td>
-        <td>${v.fecha || "-"}</td>
-        <td>${v.hora || "-"}</td>
-        <td class="page-cell">${v.pagina || "-"}</td>
-      </tr>
-    `).join("");
-  }
+    
+    tabla.innerHTML = visitas.map((v, i) => {
+        // Generamos el botón dinámico de Google Maps si existen coordenadas
+        const botonMapa = (v.latitud && v.longitud) 
+            ? `<a href="https://www.google.com/maps?q=${v.latitud},${v.longitud}" target="_blank" style="background: #25d366; color: white; padding: 3px 8px; border-radius: 4px; text-decoration: none; font-size: 12px; font-weight: bold;">📍 Ver Mapa</a>` 
+            : `<span style="color: #777; font-size: 12px;">Sin GPS</span>`;
+
+        return `
+            <tr>
+                <td class="num-cell">${i + 1}</td>
+                <td><span class="ip-badge">${v.ip || "-"}</span></td>
+                <td>${v.ciudad || "-"}</td>
+                <td>${v.pais || "-"}</td>
+                <td>${v.fecha || "-"}</td>
+                <td>${v.hora || "-"}</td>
+                <td><span class="page-badge">${v.pagina || "-"}</span></td>
+                <td>${botonMapa}</td>
+            </tr>
+        `;
+    }).join("");
+}
+  
 
   function actualizarStats(visitas) {
     const ipsUnicas = new Set(visitas.map(v => v.ip)).size;
@@ -388,19 +399,39 @@
     }
   }
 
-  function exportarCSV() {
+ function exportarCSV() {
     if (todasLasVisitas.length === 0) { alert("No hay datos para exportar."); return; }
-    const header = ["#", "IP", "Ciudad", "País", "Fecha", "Hora", "Página"];
-    const filas = todasLasVisitas.map((v, i) =>
-      [i+1, v.ip, v.ciudad, v.pais, v.fecha, v.hora, v.pagina].join(",")
-    );
+    
+    // Agregamos las columnas de GPS al Excel
+    const header = ["#", "IP", "Ciudad", "País", "Fecha", "Hora", "Página", "Latitud", "Longitud", "Mapa"];
+    
+    const filas = todasLasVisitas.map((v, i) => {
+        // Creamos el link de Google Maps si hay coordenadas
+        const linkMapa = (v.latitud && v.longitud) 
+            ? `https://www.google.com/maps?q=${v.latitud},${v.longitud}` 
+            : "Sin GPS";
+            
+        return [
+            i+1, 
+            v.ip, 
+            v.ciudad, 
+            v.pais, 
+            v.fecha, 
+            v.hora, 
+            v.pagina,
+            v.latitud || "N/A",  // Si no hay, pone N/A
+            v.longitud || "N/A", // Si no hay, pone N/A
+            linkMapa
+        ].join(",");
+    });
+    
     const csv = [header.join(","), ...filas].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "visitas_restaurante.csv";
     a.click();
-  }
+}
 
   // Iniciar
   cargarVisitas();

@@ -242,27 +242,62 @@
         console.warn("No se pudo obtener la IP/ubicación:", e);
       }
 
-      const visita = {
-        ip: ip,
-        ciudad: ciudad,
-        pais: pais,
-        fecha: new Date().toLocaleDateString(),
-        hora: new Date().toLocaleTimeString(),
-        pagina: "index.html"
-      };
+    // --- AQUÍ EMPIEZA EL CAMBIO DE GEOLOCALIZACIÓN ---
+        
+        // 1. Armamos el paquete básico con la IP y ubicación por defecto
+        const visita = {
+            ip: ip,
+            ciudad: ciudad,
+            pais: pais,
+            fecha: new Date().toLocaleDateString(),
+            hora: new Date().toLocaleTimeString(),
+            pagina: "index.html",
+            latitud: null,   // Empezamos en null por si rechaza el permiso
+            longitud: null   // Empezamos en null por si rechaza el permiso
+        };
 
-      const { data, error } = await supabaseClient
-        .from('visitas')
-        .insert([visita]);
+        // 2. Función interna que enviará los datos finales a Supabase
+        async function mandarBaseDeDatos(datosAEnviar) {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('visitas')
+                    .insert([datosAEnviar]);
 
-      console.log("Supabase insert response (index.html):", data, error);
+                console.log("Supabase insert response (index.html):", data, error);
+                if (error) throw error;
+            } catch (error) {
+                console.error("Error al registrar visita:", error);
+            }
+        }
 
-      if (error) throw error;
-    } catch (error) {
-      console.error("Error al registrar visita:", error);
+        // 3. Activamos el detective de GPS
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                async function(position) {
+                    // SI ACEPTA: Guardamos coordenadas exactas y enviamos
+                    visita.latitud = position.coords.latitude.toString();
+                    visita.longitud = position.coords.longitude.toString();
+                    await mandarBaseDeDatos(visita);
+                },
+                async function(error) {
+                    // SI RECHAZA: Enviamos solo los datos básicos (lat/lon se quedan null)
+                    console.warn("El usuario rechazó el permiso de GPS. Usando respaldo por IP.");
+                    await mandarBaseDeDatos(visita);
+                },
+                { timeout: 5000 } // Si demora más de 5 segundos en responder, pasa al plan B
+            );
+        } else {
+            // Si el navegador no soporta GPS
+            mandarBaseDeDatos(visita);
+        }
+
+    } catch (e) {
+        console.warn("No se pudo obtener la IP/ubicación:", e);
     }
-  }
-  registrarVisita();
+}
+
+// Ejecutamos la función principal al cargar la página
+registrarVisita();
 </script>
 
 </body>
